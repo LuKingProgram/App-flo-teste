@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "443178001088",
+    "project_id": "ella-50a33",
+    "storage_bucket": "ella-50a33.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:443178001088:android:4a1e958ca763a3d26cc325",
+        "android_client_info": {
+          "package_name": "com.cicloduplo.ciclo_duplo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOyYzntN4Uel3NZvE_tIjn1K6QrpgXfb4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

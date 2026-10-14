@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function pairPath(pairId) {
+      return /databases/$(database)/documents/pairs/$(pairId);
+    }
+
+    function pairData(pairId) {
+      return get(pairPath(pairId)).data;
+    }
+
+    function isPairMember(pairId) {
+      return signedIn()
+        && exists(pairPath(pairId))
+        && (pairData(pairId).ownerUid == request.auth.uid
+            || pairData(pairId).guestUid == request.auth.uid);
+    }
+
+    match /users/{userId}/cycle/{documentId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId
+                         && documentId == 'private';
+    }
+
+    match /users/{userId}/pair/{documentId} {
+      allow read, write: if signedIn()
+                         && request.auth.uid == userId
+                         && documentId == 'current';
+    }
+
+    match /pairs/{pairId} {
+      // The ten-character random document ID is the invitation code. The
+      // document is never queryable as a collection by app clients.
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'guestUid', 'status', 'createdAt', 'expiresAt'
+        ])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.guestUid == null
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.expiresAt is timestamp;
+
+      allow update: if signedIn() && (
+        (resource.data.status == 'pending'
+          && resource.data.guestUid == null
+          && resource.data.expiresAt > request.time
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.guestUid == request.auth.uid
+          && request.resource.data.status == 'active'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'guestUid', 'status', 'joinedAt'
+          ])
+          && request.resource.data.joinedAt is timestamp)
+        ||
+        (isPairMember(pairId)
+          && resource.data.status != 'closed'
+          && request.resource.data.status == 'closed'
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.guestUid == resource.data.guestUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'closedAt'
+          ])
+          && request.resource.data.closedAt is timestamp)
+      );
+
+      allow delete: if signedIn()
+        && resource.data.ownerUid == request.auth.uid;
+
+      match /cycle/{documentId} {
+        allow read: if documentId == 'current'
+          && isPairMember(pairId)
+          && pairData(pairId).status == 'active';
+        allow create, update: if documentId == 'current'
+          && signedIn()
+          && pairData(pairId).ownerUid == request.auth.uid
+          && pairData(pairId).status in ['pending', 'active'];
+        allow delete: if documentId == 'current'
+          && signedIn()
+          && pairData(pairId).ownerUid == request.auth.uid;
+      }
+    }
+  }
+}
